@@ -1,17 +1,22 @@
 # ================================================================
 #  app.py — Application principale Flask pour LoL Wild's Picks
+#  Version persistante (PostgreSQL - Railway)
 # ================================================================
 
 from flask import Flask, render_template, request, jsonify
+from flask_sqlalchemy import SQLAlchemy
 import json, os
-from champions import CHAMPIONS
-
 
 # ================================================================
 #  ⚙️ CONFIGURATION DE L’APPLICATION
 # ================================================================
 
 app = Flask(__name__)
+
+# Railway fournit la variable d'environnement DATABASE_URL automatiquement
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", "sqlite:///champions.db")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db = SQLAlchemy(app)
 
 
 # ================================================================
@@ -61,116 +66,109 @@ REASON_LABELS = {
 
 
 # ================================================================
+#  🗄️ BASE DE DONNÉES PERSISTANTE
+# ================================================================
+
+class Champion(db.Model):
+    name = db.Column(db.String(80), primary_key=True)
+    data = db.Column(db.JSON, nullable=False)
+
+
+with app.app_context():
+    db.create_all()
+    # Si la base est vide, on initialise avec champions.json
+    if not Champion.query.first() and os.path.exists("champions.json"):
+        with open("champions.json", "r", encoding="utf-8") as f:
+            data = json.load(f)
+            for name, meta in data.items():
+                db.session.add(Champion(name=name, data=meta))
+            db.session.commit()
+
+
+# ================================================================
 #  🧮 SYSTÈME DE SCORING DES CHAMPIONS
 # ================================================================
 
 def score_with_answers(meta: dict, answers: dict):
-    """Calcule le score d’un champion selon les réponses utilisateur."""
     score = 0
     reasons = []
-
     for text, key, weight in QUESTIONS:
         ans = bool(answers.get(key, False))
         if ans and meta.get(key, False):
             score += weight
             label = REASON_LABELS.get(key, text)
             reasons.append({"key": key, "label": label, "weight": weight})
-
     return score, reasons
 
 
 # ================================================================
-#  🌐 ROUTES UTILISATEUR (frontend)
+#  🌐 ROUTES UTILISATEUR
 # ================================================================
 
 @app.route("/", methods=["GET"])
 def index():
-    """Page d’accueil principale."""
     return render_template("index.html", q_count=len(QUESTIONS))
 
 
 @app.route("/questions", methods=["GET"])
 def get_questions():
-    """Renvoie la liste complète des questions au format JSON."""
     return jsonify([{"text": q[0], "key": q[1], "weight": q[2]} for q in QUESTIONS])
 
 
 @app.route("/recommend", methods=["POST"])
 def recommend():
-    """Renvoie une liste de champions recommandés selon les réponses."""
     data = request.get_json(force=True) or {}
     answers = data.get("answers", {})
     max_results = int(data.get("max_results", 6))
 
     scored = []
-    for champ, meta in CHAMPIONS.items():
+    for champ in Champion.query.all():
+        meta = champ.data
         s, reasons = score_with_answers(meta, answers)
         if s > 0:
-            # ✅ Vérifie que l’icône est une URL Riot valide
             icon = meta.get("icon")
             if not icon or not str(icon).startswith("http"):
                 icon = None
-
             scored.append({
-                "champion": champ,
+                "champion": champ.name,
                 "score": s,
                 "reasons": reasons[:5],
                 "icon": icon,
                 "tags": [k for k, v in meta.items() if isinstance(v, bool) and v],
             })
 
-    # Tri décroissant selon le score
     scored.sort(key=lambda x: x["score"], reverse=True)
     return jsonify(scored[:max_results])
 
 
 # ================================================================
-#  🔐 ADMINISTRATION (interface / sauvegarde)
+#  🔐 ADMINISTRATION
 # ================================================================
-
-DATA_FILE = "champions.json"
-
-# --- Chargement initial des champions depuis le fichier local ---
-if os.path.exists(DATA_FILE):
-    with open(DATA_FILE, "r", encoding="utf-8") as f:
-        CHAMPIONS.update(json.load(f))
-
 
 @app.route("/admin")
 def admin():
-    """Page d’administration des champions."""
-    return render_template("admin.html", champions=CHAMPIONS, reason_labels=REASON_LABELS)
+    champs = {c.name: c.data for c in Champion.query.all()}
+    return render_template("admin.html", champions=champs, reason_labels=REASON_LABELS)
 
 
 @app.route("/api/champions", methods=["GET"])
 def api_get_champions():
-    """API : renvoie la base complète des champions."""
-    return jsonify(CHAMPIONS)
+    champs = {c.name: c.data for c in Champion.query.all()}
+    return jsonify(champs)
 
 
 @app.route("/api/champions", methods=["POST"])
 def api_save_champions():
-    """API : sauvegarde les modifications sur les champions."""
     data = request.get_json(force=True) or {}
-
-    # --- 🧹 Nettoyage des icônes non valides ---
-    for champ, meta in data.items():
-        if "icon" not in meta or not str(meta["icon"]).startswith("http"):
-            meta.pop("icon", None)
-
-    # --- Sauvegarde dans le fichier JSON ---
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-    # --- Rafraîchissement en mémoire ---
-    CHAMPIONS.clear()
-    CHAMPIONS.update(data)
-
+    Champion.query.delete()
+    for name, meta in data.items():
+        db.session.add(Champion(name=name, data=meta))
+    db.session.commit()
     return jsonify({"status": "ok"})
 
 
 # ================================================================
-#  🚀 MAIN (lancement du serveur Flask)
+#  🚀 MAIN
 # ================================================================
 
 if __name__ == "__main__":
