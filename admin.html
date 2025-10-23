@@ -126,15 +126,12 @@ async function loadChampions() {
 /* =========================================================
    ➕ 5. Ajout manuel d’un nouveau champion
    ========================================================= */
-/* =========================================================
-   ➕ 5. Ajout manuel d’un nouveau champion
-   ========================================================= */
+<script>
 function addChampionCard() {
   const list = document.getElementById("champions-list");
   const card = document.createElement("div");
   card.className = "champ-card new";
 
-  // --- Cases à cocher vierges ---
   const attrHTML = ATTRS.map(a => {
     const label = ATTR_LABELS[a] || a;
     return `
@@ -144,7 +141,6 @@ function addChampionCard() {
       </label>`;
   }).join("");
 
-  // --- Structure HTML du nouveau bloc ---
   card.innerHTML = `
     <div class="champ-header">
       <img src="/static/icons/new.png" class="champ-icon" alt="">
@@ -156,23 +152,27 @@ function addChampionCard() {
     </div>
   `;
 
-  // --- Ajout au DOM ---
   list.appendChild(card);
 
-  // --- Gestion de la suppression ---
+  // suppression
   card.querySelector(".del").addEventListener("click", () => card.remove());
 
-  // --- Scroll fluide vers la nouvelle carte ---
-  card.scrollIntoView({ behavior: "smooth", block: "center" });
+  // Laisse le DOM se re-render puis scroll → fiable
+  requestAnimationFrame(() => {
+    const y = card.getBoundingClientRect().top + window.scrollY - 90; // offset sous l’entête
+    window.scrollTo({ top: y, behavior: "smooth" });
 
-  // --- Effet de surbrillance dorée temporaire ---
-  card.classList.add("highlight");
-  setTimeout(() => card.classList.remove("highlight"), 1600);
+    // highlight doré temporaire
+    card.classList.add("highlight");
+    setTimeout(() => card.classList.remove("highlight"), 1800);
+
+    // focus le champ de nom pour gain de temps
+    const nameInput = card.querySelector(".champ-name");
+    if (nameInput) { nameInput.focus(); nameInput.select(); }
+  });
 }
+</script>
 
-  // --- Ajout et gestion du bouton de suppression ---
-  list.appendChild(card);
-  card.querySelector(".del").addEventListener("click", () => card.remove());
 
 /* =========================================================
    💾 6. Sauvegarde des modifications (POST → Flask)
