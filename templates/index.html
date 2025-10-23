@@ -1,0 +1,70 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- ===============================
+     SECTION PRINCIPALE : Questionnaire
+     =============================== -->
+<section class="panel centered">
+
+  <!-- ===============================
+       Boîte de questions et progression
+       =============================== -->
+  <div id="qa-box">
+
+    <!-- Barre de progression (texte + jauge) -->
+    <div class="progress-wrap" id="progress-container">
+      <div id="progress-text" class="progress-text">
+        Question 1 / {{ q_count }}
+      </div>
+      <div class="progress-bar">
+        <div id="progress-meter"></div>
+      </div>
+    </div>
+
+    <!-- Question affichée dynamiquement -->
+    <div id="question" class="question">Chargement…</div>
+
+    <!-- Boutons de réponse Oui / Non -->
+    <div class="actions center">
+      <button id="btn-yes" class="btn" type="button">Oui</button>
+      <button id="btn-no" class="btn btn-ghost" type="button">Non</button>
+    </div>
+
+  </div>
+
+  <!-- ===============================
+       SECTION DES RÉSULTATS
+       (affichée après les questions)
+       =============================== -->
+  <div id="results-box" class="hidden">
+    <h2 class="h2">Résultats</h2>
+
+    <!-- Choix du nombre de résultats à afficher -->
+    <div class="actions">
+      <select id="max-results" class="select">
+        <option value="3">Top 3</option>
+        <option value="6" selected>Top 6</option>
+        <option value="10">Top 10</option>
+      </select>
+    </div>
+
+    <!-- Zone où les résultats seront injectés en JS -->
+    <div id="results" class="results"></div>
+  </div>
+
+</section>
+{% endblock %}
+
+{% block scripts %}
+<!-- ===============================
+     SCRIPTS
+     =============================== -->
+
+<!-- Nombre total de questions, injecté depuis Flask -->
+<script>
+const Q_COUNT = {{ q_count }};
+</script>
+
+<!-- Script principal du questionnaire -->
+<script src="{{ url_for('static', filename='js/questions.js') }}"></script>
+{% endblock %}

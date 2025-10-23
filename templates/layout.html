@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="fr" class="h-full">
+  <head>
+    <!-- ===============================
+         MÉTA-INFOS ET CONFIGURATION DE BASE
+         =============================== -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>LoL Wild's Picks — Q/R</title>
+
+    <!-- ===============================
+         POLICES ET STYLES
+         =============================== -->
+    <!-- Préchargement des polices Google -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- Police principale : Inter (400, 600, 800) -->
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap"
+      rel="stylesheet"
+    >
+    <!-- Feuille de style principale -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+
+  <body class="dark">
+    <!-- ===============================
+         EN-TÊTE DU SITE
+         =============================== -->
+    <header class="header">
+      <div class="container header-flex">
+
+        <!-- Logo + Nom du projet -->
+        <div
+          class="brand clickable"
+          id="brand-restart"
+          onclick="window.location.href='/'"
+        >
+          <img
+            class="brand-logo"
+            src="{{ url_for('static', filename='icons/jungle.png') }}"
+            alt="Logo Jungle"
+          >
+          <div>
+            <div class="brand-title">Wild Drafter</div>
+            <div class="brand-sub">Assistant de draft</div>
+          </div>
+        </div>
+
+        <!-- Icône d’accès à la page d’administration -->
+        <div
+          class="admin-icon-wrap"
+          onclick="window.location.href='/admin'"
+          title="Administration"
+        >
+          <span class="admin-emoji">⚙️</span>
+        </div>
+
+      </div>
+    </header>
+
+    <!-- ===============================
+         CONTENU PRINCIPAL
+         (rempli dynamiquement selon la page)
+         =============================== -->
+    <main class="container">
+      {% block content %}{% endblock %}
+    </main>
+
+    <!-- ===============================
+         PIED DE PAGE
+         =============================== -->
+    <footer class="footer">
+      <div class="container">
+        <span>© {{ 2025 }} Wild</span>
+      </div>
+    </footer>
+
+    <!-- ===============================
+         BLOCS DE SCRIPTS SPÉCIFIQUES À CHAQUE PAGE
+         =============================== -->
+    {% block scripts %}{% endblock %}
+
+    <!-- ===============================
+         TRANSITION / ANIMATION (placeholder)
+         =============================== -->
+    <div id="transition-wrapper" class="transition-wrapper"></div>
+
+    <!-- ===============================
+         SCRIPT GÉNÉRAL DE NAVIGATION
+         (redirection au clic sur le logo)
+         =============================== -->
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const restart = document.getElementById("brand-restart");
+      if (restart) {
+        restart.addEventListener("click", () => window.location.href = "/");
+      }
+    });
+    </script>
+  </body>
+</html>

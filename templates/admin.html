@@ -1,0 +1,232 @@
+{% extends "layout.html" %}
+
+{% block content %}
+<!-- ========================================================= -->
+<!-- 🧩 SECTION : Interface d'administration des champions      -->
+<!-- ========================================================= -->
+<section class="panel centered">
+  <h2 class="h2" style="margin-bottom: 20px;">Gestion des champions</h2>
+
+  <!-- --- Boutons d'action (ajout et sauvegarde) --- -->
+  <div class="center" style="margin-bottom: 18px;">
+    <button id="add-champ" class="btn">+ Ajouter</button>
+    <button id="save-changes" class="btn btn-ghost">💾 Sauvegarder</button>
+  </div>
+
+  <!-- --- Liste dynamique des champions --- -->
+  <div id="champions-list" class="admin-grid"></div>
+</section>
+<button id="floating-save" title="Sauvegarder les changements">💾 Sauvegarder</button>
+{% endblock %}
+
+{% block scripts %}
+<script>
+/* =========================================================
+   ⚙️ 1. Données et constantes globales
+   ========================================================= */
+const ATTR_LABELS = {{ reason_labels | tojson | safe }};
+let ATTRS = Object.keys(ATTR_LABELS).sort((a, b) =>
+  ATTR_LABELS[a].toLowerCase().localeCompare(ATTR_LABELS[b].toLowerCase())
+);
+
+// --- Données officielles de Riot (version courante) ---
+const CHAMP_DATA_URL = "https://ddragon.leagueoflegends.com/cdn/14.23.1/data/en_US/champion.json";
+let CHAMP_DATA = {};
+
+
+/* =========================================================
+   🌐 2. Chargement des données officielles Riot
+   ========================================================= */
+async function loadChampionData() {
+  const res = await fetch(CHAMP_DATA_URL);
+  const data = await res.json();
+  CHAMP_DATA = data.data;
+}
+
+
+/* =========================================================
+   🖼️ 3. Génération du lien d’icône officiel Riot
+   ========================================================= */
+function getChampionIconURL(champName) {
+  if (!CHAMP_DATA || Object.keys(CHAMP_DATA).length === 0)
+    return "/static/icons/new.png";
+
+  // --- Nettoyage du nom pour correspondance sûre ---
+  const normalize = s => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const clean = normalize(champName);
+
+  // --- Cas spécial : Wukong → MonkeyKing ---
+  console.log("Nom brut :", champName, "→ clean =", clean);
+  if (clean === "wukong") {
+    return "https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/MonkeyKing.png";
+  }
+
+  // --- Recherche d’un match exact dans la base Riot ---
+  const key = Object.keys(CHAMP_DATA).find(k => normalize(k) === clean);
+
+  // --- Si trouvé, on renvoie le lien officiel ---
+  if (key) {
+    return `https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/${key}.png`;
+  }
+
+  // --- Fallback : tentative avec la version brute ---
+  return `https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/${champName.replace(/\s+/g, '')}.png`;
+}
+
+
+/* =========================================================
+   📋 4. Chargement et affichage des champions existants
+   ========================================================= */
+async function loadChampions() {
+  const res = await fetch("/api/champions");
+  const champs = await res.json();
+  const list = document.getElementById("champions-list");
+  list.innerHTML = "";
+
+  // ✅ Tri alphabétique
+  const sorted = Object.entries(champs)
+    .sort((a, b) => a[0].localeCompare(b[0], 'fr', { sensitivity: 'base' }));
+
+  // --- Création dynamique de chaque "carte" champion ---
+  sorted.forEach(([name, meta]) => {
+    const card = document.createElement("div");
+    card.className = "champ-card";
+
+    // --- Cases à cocher pour les attributs ---
+    const attrHTML = ATTRS.map(a => {
+      const checked = meta[a] ? "checked" : "";
+      const label = ATTR_LABELS[a] || a;
+      return `
+        <label class="attr">
+          <input type="checkbox" data-key="${a}" ${checked}>
+          <span>${label}</span>
+        </label>`;
+    }).join("");
+
+    // --- Structure HTML d'une carte ---
+    card.innerHTML = `
+      <div class="champ-header">
+        <img src="${getChampionIconURL(name)}" class="champ-icon" alt="">
+        <input value="${name}" data-key="__name__" class="champ-name"/>
+      </div>
+      <div class="champ-attrs">${attrHTML}</div>
+      <div class="champ-actions">
+        <button class="btn btn-ghost del">🗑 Supprimer</button>
+      </div>
+    `;
+
+    // --- Ajout au DOM ---
+    list.appendChild(card);
+
+    // --- Suppression de la carte ---
+    card.querySelector(".del").addEventListener("click", () => card.remove());
+  });
+}
+
+/* =========================================================
+   ➕ 5. Ajout manuel d’un nouveau champion
+   ========================================================= */
+function addChampionCard() {
+  const list = document.getElementById("champions-list");
+  const card = document.createElement("div");
+  card.className = "champ-card new";
+
+  // --- Cases à cocher vierges ---
+  const attrHTML = ATTRS.map(a => {
+    const label = ATTR_LABELS[a] || a;
+    return `
+      <label class="attr">
+        <input type="checkbox" data-key="${a}">
+        <span>${label}</span>
+      </label>`;
+  }).join("");
+
+  // --- Structure HTML du nouveau bloc ---
+  card.innerHTML = `
+    <div class="champ-header">
+      <img src="/static/icons/new.png" class="champ-icon" alt="">
+      <input value="Nouveau" data-key="__name__" class="champ-name"/>
+    </div>
+    <div class="champ-attrs">${attrHTML}</div>
+    <div class="champ-actions">
+      <button class="btn btn-ghost del">🗑 Supprimer</button>
+    </div>
+  `;
+
+  // --- Ajout et gestion du bouton de suppression ---
+  list.appendChild(card);
+  card.querySelector(".del").addEventListener("click", () => card.remove());
+}
+
+/* =========================================================
+   💾 6. Sauvegarde des modifications (POST → Flask)
+   ========================================================= */
+async function saveChanges() {
+  const cards = document.querySelectorAll(".champ-card");
+  const out = {};
+
+  // --- Récupération des infos de chaque carte ---
+  cards.forEach(c => {
+    const name = c.querySelector('[data-key="__name__"]').value.trim();
+    const meta = {};
+
+    // --- Statuts des cases à cocher ---
+    c.querySelectorAll("input[type=checkbox]").forEach(chk => {
+      meta[chk.dataset.key] = chk.checked;
+    });
+
+    // --- Ajout de l'icône officielle ---
+    meta.icon = getChampionIconURL(name);
+    out[name] = meta;
+  });
+
+  // --- Envoi au serveur ---
+  const res = await fetch("/api/champions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(out)
+  });
+
+  if (res.ok) {
+    alert("✅ Sauvegardé !");
+    // 🔄 recharge dynamique sans refresh complet
+    await loadChampions();
+  } else {
+    alert("❌ Erreur lors de la sauvegarde !");
+  }
+}
+
+/* =========================================================
+   🚀 7. Initialisation à l’ouverture de la page
+   ========================================================= */
+document.getElementById("add-champ").addEventListener("click", addChampionCard);
+document.getElementById("save-changes").addEventListener("click", saveChanges);
+document.getElementById("floating-save").addEventListener("click", saveChanges);
+
+(async () => {
+  await loadChampionData();
+  await loadChampions();
+})();
+
+// === Bouton flottant visible seulement quand le bouton principal sort du cadre ===
+const topSave = document.getElementById("save-changes");
+const floatSave = document.getElementById("floating-save");
+
+// === Animation de transition du bouton flottant ===
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      // 🔹 Le bouton original revient dans la vue → anim de disparition douce
+      floatSave.classList.remove("visible");
+    } else {
+      // 🔸 Le bouton sort du cadre → apparition avec mouvement + zoom
+      floatSave.classList.add("visible");
+    }
+  });
+}, { threshold: 0.1 });
+
+// Démarre l’observation
+if (topSave) observer.observe(topSave);
+floatSave.style.transitionDelay = "0s";
+</script>
+{% endblock %}
