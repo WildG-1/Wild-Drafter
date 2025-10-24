@@ -264,11 +264,7 @@ function flashSavedEffect() {
     closeModal();
   })();
 });
-</script>
-{% endblock %}
 
-{% block scripts %}
-<script>
 const ATTR_LABELS = {{ reason_labels | tojson | safe }};
 let GLOBAL_CHAMPIONS = {{ champions | tojson | safe }}; // ceux du serveur
 let USER_CHAMPIONS = JSON.parse(localStorage.getItem("user_champions")) || GLOBAL_CHAMPIONS;
