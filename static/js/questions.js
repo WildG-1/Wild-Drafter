@@ -102,7 +102,7 @@ function renderResults(items) {
   // Génération des cartes
   for (const it of items) {
     const card = document.createElement("div");
-    card.className = "card";
+    card.className = "card champion-card"; // 👈 ajout de la classe fade-in
     card.innerHTML = `
       <div class="icon-wrap">
         <img class="icon" alt="${it.champion}" src="${it.icon}">
@@ -126,6 +126,14 @@ function renderResults(items) {
     `;
     resultsRoot.appendChild(card);
   }
+
+  // ✨ Effet fade-in progressif des cartes
+  const cards = document.querySelectorAll('.champion-card');
+  setTimeout(() => {
+    cards.forEach((card, index) => {
+      setTimeout(() => card.classList.add('visible'), index * 80);
+    });
+  }, 100);
 }
 
 
@@ -183,21 +191,16 @@ async function finalizeAndShowResults() {
    ============================================================ */
 
 async function handleAnswer(value) {
-  // 1. Enregistre la réponse
   const key = QUESTIONS[idx].key;
   answers[key] = value;
-
-  // 2. Passe à la suivante
   idx += 1;
 
-  // 3. Si on vient de répondre à la dernière
   if (idx === QUESTIONS.length) {
     updateProgress();
     await finalizeAndShowResults();
     return;
   }
 
-  // 4. Sinon, affiche la suivante
   showQuestion();
 }
 
@@ -209,23 +212,20 @@ async function handleAnswer(value) {
    nombre max de résultats affichés.
    ============================================================ */
 
-// Boutons Oui / Non
 btnYes.addEventListener("click", () => handleAnswer(true));
 btnNo.addEventListener("click", () => handleAnswer(false));
 
-// Bouton "Recommencer"
 document.getElementById("brand-restart").addEventListener("click", () => {
   answers = {};
   idx = 0;
   resultsBox.classList.add("hidden");
   qaBox.classList.remove("hidden");
-  progressMeter.style.width = "0%"; // reset complet
+  progressMeter.style.width = "0%";
   updateProgress();
   showQuestion();
   window.scrollTo({top: 0, behavior: "smooth"});
 });
 
-// Changement du nombre max de résultats affichés
 maxResultsSel.addEventListener("change", async () => {
   if (resultsBox.classList.contains("hidden")) return;
   const max_results = maxResultsSel.value;
@@ -245,7 +245,7 @@ maxResultsSel.addEventListener("change", async () => {
   QUESTIONS = await getJSON("/questions");
   idx = 0;
   answers = {};
-  progressMeter.style.width = "0%"; // barre vide au départ
+  progressMeter.style.width = "0%";
   updateProgress();
   showQuestion();
 })();
