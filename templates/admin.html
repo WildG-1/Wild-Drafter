@@ -272,7 +272,6 @@ let USER_CHAMPIONS = JSON.parse(localStorage.getItem("user_champions")) || GLOBA
 // --- Fonction pour sauvegarder localement ---
 function saveLocalChampions() {
   localStorage.setItem("user_champions", JSON.stringify(USER_CHAMPIONS));
-  alert("✅ Champions enregistrés localement !");
 }
 
 // --- Exemple : affichage de la liste ---
@@ -289,17 +288,6 @@ function renderChampionList() {
     list.appendChild(div);
   });
 }
-
-// --- Ajout d’un champion ---
-document.getElementById("add-champ").addEventListener("click", () => {
-  const name = prompt("Nom du champion :");
-  if (!name) return;
-  USER_CHAMPIONS.push({
-    name,
-    icon: "https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/" + name + ".png"
-  });
-  renderChampionList();
-});
 
 // --- Sauvegarde manuelle ---
 document.getElementById("save-changes").addEventListener("click", saveLocalChampions);
