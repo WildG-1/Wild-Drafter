@@ -266,3 +266,49 @@ function flashSavedEffect() {
 });
 </script>
 {% endblock %}
+
+{% block scripts %}
+<script>
+const ATTR_LABELS = {{ reason_labels | tojson | safe }};
+let GLOBAL_CHAMPIONS = {{ champions | tojson | safe }}; // ceux du serveur
+let USER_CHAMPIONS = JSON.parse(localStorage.getItem("user_champions")) || GLOBAL_CHAMPIONS;
+
+// --- Fonction pour sauvegarder localement ---
+function saveLocalChampions() {
+  localStorage.setItem("user_champions", JSON.stringify(USER_CHAMPIONS));
+  alert("✅ Champions enregistrés localement !");
+}
+
+// --- Exemple : affichage de la liste ---
+function renderChampionList() {
+  const list = document.getElementById("champions-list");
+  list.innerHTML = "";
+  USER_CHAMPIONS.forEach(champ => {
+    const div = document.createElement("div");
+    div.className = "champ-card";
+    div.innerHTML = `
+      <img src="${champ.icon}" class="champ-icon">
+      <span>${champ.name}</span>
+    `;
+    list.appendChild(div);
+  });
+}
+
+// --- Ajout d’un champion ---
+document.getElementById("add-champ").addEventListener("click", () => {
+  const name = prompt("Nom du champion :");
+  if (!name) return;
+  USER_CHAMPIONS.push({
+    name,
+    icon: "https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/" + name + ".png"
+  });
+  renderChampionList();
+});
+
+// --- Sauvegarde manuelle ---
+document.getElementById("save-changes").addEventListener("click", saveLocalChampions);
+
+// --- Chargement initial ---
+renderChampionList();
+</script>
+{% endblock %}
