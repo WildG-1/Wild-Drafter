@@ -1,118 +1,110 @@
-// ============================================================
-//  🔹 FICHIER : livePreview.js
-//  🔹 RÔLE : Met à jour la colonne Live Preview en temps réel
-//            mais ne l'affiche que lorsqu'on le demande
-// ============================================================
+// ============================================================================
+//  Live Preview — suggestions en direct pendant le questionnaire
+//  Cette version partage la logique de payload local et respecte le debounce
+//  pour limiter les appels réseaux.
+// ============================================================================
 
-// État global partagé avec questions.js
-window.liveAnswers = window.liveAnswers || {};
-const resultsList = document.getElementById("results-list");
-const livePreview = document.getElementById("live-preview");
+(() => {
+  const STORAGE_KEY = window.WILD_DRAFTER?.STORAGE_KEY ?? "wild_drafter.customChampions";
 
-// --- Message d'intro (si aucun contenu encore affiché) ---
-if (resultsList && !resultsList.children.length) {
-  resultsList.innerHTML = `
-    <div class="live-placeholder">
-      <p>Commencez le questionnaire pour voir apparaître les premiers résultats</p>
-    </div>
-  `;
-}
+  const resultsList = document.getElementById("results-list");
+  const livePreview = document.getElementById("live-preview");
 
-// === Anti-spam d’appels réseau ===
-let livePreviewTimeout = null;
-
-// ============================================================
-//  🧠 FONCTION PRINCIPALE — Mise à jour du contenu du Live Preview
-// ============================================================
-async function updateLivePreview() {
   if (!resultsList) return;
 
-  clearTimeout(livePreviewTimeout);
-  livePreviewTimeout = setTimeout(async () => {
+  const placeholder = `
+    <div class="live-placeholder">
+      <p>Commence le questionnaire pour voir apparaître les premiers résultats.</p>
+    </div>`;
+  resultsList.innerHTML = placeholder;
+
+  function getLocalPayload() {
     try {
-      const maxSel = document.getElementById("max-results");
-      const max = maxSel ? Number(maxSel.value) : 6;
-
-      const res = await fetch("/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          answers: window.liveAnswers,
-          max_results: max,
-        }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      // 🔄 Vide le contenu actuel
-      resultsList.innerHTML = "";
-
-      // --- Cas : aucun résultat ---
-      if (!data.length) {
-        resultsList.innerHTML =
-          "<p style='opacity:0.6'>Aucun résultat pour l’instant</p>";
-        return;
-      }
-
-      // --- Création fluide des cartes champions ---
-      data.forEach((it, index) => {
-        const div = document.createElement("div");
-        div.className = "champion-card";
-
-        // 🔧 Fallback icône : si aucune URL dans la base, on prend Data Dragon
-        const cleanName = (it.champion || "")
-          .replace(/[\s'\.]/g, "")
-          .replace("Wukong", "MonkeyKing")
-          .replace("LeBlanc", "Leblanc")
-          .replace("Cho'Gath", "Chogath")
-          .replace("Bel'Veth", "Belveth")
-          .replace("Jarvan IV", "JarvanIV");
-
-        const iconUrl =
-          it.icon && it.icon.startsWith("http")
-            ? it.icon
-            : `https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/${cleanName}.png`;
-
-        div.innerHTML = `
-          <img src="${iconUrl}" alt="${it.champion}">
-          <span class="champion-name">${it.champion}</span>
-          <span class="champion-score">+${it.score}</span>
-        `;
-        resultsList.appendChild(div);
-
-        // ✨ Apparition fluide progressive
-        setTimeout(() => div.classList.add("visible"), index * 70);
-      });
-    } catch (err) {
-      console.error("Erreur Live Preview :", err);
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+      console.warn("Impossible de lire le payload local", error);
+      return null;
     }
-  }, 120);
-}
+  }
 
-// ============================================================
-//  🖱️ SYNCHRONISATION DES CLICS "OUI" / "NON"
-// ============================================================
-document.addEventListener("click", (e) => {
-  if (e.target.id !== "btn-yes" && e.target.id !== "btn-no") return;
+  let debounceHandle = null;
 
-  const key = window.currentQuestionKey;
-  if (!key) return;
+  async function fetchPreview(answers, maxResults) {
+    const payload = getLocalPayload();
+    const body = { answers, max_results: maxResults };
+    if (payload) body.payload = payload;
 
-  // ✅ Stocke les réponses sous forme de booléens
-  window.liveAnswers[key] = e.target.id === "btn-yes";
+    const res = await fetch("/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) throw new Error(`Preview → ${res.status}`);
+    return res.json();
+  }
 
-  // 🔁 Met à jour les données (sans afficher le panneau)
-  updateLivePreview();
-});
+  function renderPreview(items) {
+    resultsList.innerHTML = "";
 
-// ============================================================
-//  🎚️ AFFICHAGE MANUEL DU LIVE PREVIEW
-// ============================================================
-const togglePreviewBtn = document.getElementById("toggle-preview");
+    if (!items.length) {
+      resultsList.innerHTML = "<p style='opacity:0.6'>Aucun résultat pour l’instant</p>";
+      return;
+    }
 
-if (togglePreviewBtn && livePreview) {
-  togglePreviewBtn.addEventListener("click", () => {
-    livePreview.classList.toggle("visible");
+    items.forEach((item, index) => {
+      const div = document.createElement("div");
+      div.className = "champion-card";
+      div.innerHTML = `
+        <img src="${item.icon}" alt="${item.champion}">
+        <span class="champion-name">${item.champion}</span>
+        <span class="champion-score">+${item.score}</span>`;
+      resultsList.appendChild(div);
+      setTimeout(() => div.classList.add("visible"), index * 70);
+    });
+  }
+
+  function clearPreview() {
+    resultsList.innerHTML = placeholder;
+  }
+
+  function getMaxResults(options) {
+    if (options?.maxResults) return Number(options.maxResults);
+    const select = document.getElementById("max-results");
+    return select ? Number(select.value) : 6;
+  }
+
+  async function updatePreview(answers = {}, options = {}) {
+    const hasAnswer = Object.values(answers || {}).some((value) => value === true || value === false);
+    if (options.reset || !hasAnswer) {
+      clearPreview();
+      return;
+    }
+
+    const maxResults = getMaxResults(options);
+
+    clearTimeout(debounceHandle);
+    debounceHandle = setTimeout(async () => {
+      try {
+        const data = await fetchPreview(answers, maxResults);
+        renderPreview(data);
+      } catch (error) {
+        console.error("Erreur Live Preview", error);
+      }
+    }, 150);
+  }
+
+  window.updateLivePreview = updatePreview;
+
+  window.addEventListener("wilddrafter:restart", () => {
+    clearPreview();
   });
-}
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && livePreview?.classList.contains("visible")) {
+      updatePreview(window.liveAnswers || {});
+    }
+  });
+})();

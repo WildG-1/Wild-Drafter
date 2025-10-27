@@ -1,16 +1,10 @@
 <!doctype html>
 <html lang="fr" class="h-full">
   <head>
-    <!-- ===============================
-         MÉTA-INFOS ET CONFIGURATION DE BASE
-         =============================== -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Wild Drafter</title>
 
-    <!-- ===============================
-         POLICES ET STYLES
-         =============================== -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -19,43 +13,25 @@
     >
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 
-    <!-- ===============================
-         TRANSITIONS ENTRE PAGES (Cross-Document View Transition)
-         =============================== -->
     <style>
-      /* Active les transitions natives */
       @view-transition { navigation: auto; }
-
-      /* Empêche le body complet d'être animé */
       :root { view-transition-name: none; }
-
-      /* Le container principal : seul élément animé entre les pages */
-      main.container {
-        contain: view-transition;
-        view-transition-name: page;
-      }
-
-      /* Animation fluide sur le container */
+      main.container { contain: view-transition; view-transition-name: page; }
       html::view-transition-old(page),
       html::view-transition-new(page) {
         animation-duration: .32s;
         animation-timing-function: cubic-bezier(.2, .6, .2, 1);
       }
-
       @keyframes fade-slide-out {
         from { opacity: 1; transform: translateY(0) scale(1); }
-        to   { opacity: 0; transform: translateY(6px) scale(.98); }
+        to { opacity: 0; transform: translateY(6px) scale(.98); }
       }
-
       @keyframes fade-slide-in {
         from { opacity: 0; transform: translateY(6px) scale(.98); }
-        to   { opacity: 1; transform: translateY(0) scale(1); }
+        to { opacity: 1; transform: translateY(0) scale(1); }
       }
-
       html::view-transition-old(page) { animation-name: fade-slide-out; }
       html::view-transition-new(page) { animation-name: fade-slide-in; }
-
-      /* Accessibilité : pas d’animation pour ceux qui réduisent le mouvement */
       @media (prefers-reduced-motion: reduce) {
         html::view-transition-old(page),
         html::view-transition-new(page) {
@@ -64,20 +40,10 @@
       }
     </style>
   </head>
-
   <body class="dark">
-    <!-- ===============================
-         EN-TÊTE DU SITE
-         =============================== -->
     <header class="header">
       <div class="container header-flex">
-
-        <!-- Logo + Nom du projet -->
-        <div
-          class="brand clickable"
-          id="brand-restart"
-          onclick="window.location.href='/'"
-        >
+        <div class="brand clickable" id="brand-restart">
           <img
             class="brand-logo"
             src="{{ url_for('static', filename='icons/jungle.png') }}"
@@ -89,15 +55,12 @@
           </div>
         </div>
 
-        <!-- 🔧 Boutons : Live Preview / Admin / Changelog -->
         <div class="header-right">
-          <!-- 🔴 Bouton Live Preview global -->
           <button id="toggle-live" class="btn-live disabled" title="Live Preview">
             <span class="live-dot"></span>
             Live Preview
           </button>
 
-          <!-- ⚙️ Icône Administration -->
           <button
             class="icon-circle"
             type="button"
@@ -108,7 +71,6 @@
             <span class="admin-emoji" aria-hidden="true">⚙️</span>
           </button>
 
-          <!-- 🗒️ Icône Changelog -->
           <a
             href="{{ url_for('changelog') }}"
             class="icon-circle changelog-btn"
@@ -128,66 +90,48 @@
       </div>
     </header>
 
-    <!-- ===============================
-         CONTENU PRINCIPAL
-         =============================== -->
     <main class="container">
       {% block content %}{% endblock %}
     </main>
 
-    <!-- ===============================
-         PIED DE PAGE
-         =============================== -->
     <footer class="footer">
       <div class="container">
-        <span>🛠️ Wild x ChatGPT - {{ 2025 }}</span>
+        <span>🛠️ Wild x ChatGPT - {{ current_year }}</span>
       </div>
     </footer>
 
-    <!-- ===============================
-         BLOCS DE SCRIPTS SPÉCIFIQUES À CHAQUE PAGE
-         =============================== -->
     {% block scripts %}{% endblock %}
 
-    <!-- ===============================
-         WRAPPER DE TRANSITION (facultatif)
-         =============================== -->
     <div id="transition-wrapper" class="transition-wrapper"></div>
 
-    <!-- ===============================
-         SCRIPT GÉNÉRAL DE NAVIGATION
-         =============================== -->
     <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const restart = document.getElementById("brand-restart");
-      if (restart) {
-        restart.addEventListener("click", () => window.location.href = "/");
-      }
-    });
-    </script>
+      window.WILD_DRAFTER = Object.assign(window.WILD_DRAFTER || {}, {
+        STORAGE_KEY: "wild_drafter.customChampions"
+      });
 
-    <!-- ===============================
-         SCRIPT DE GESTION DU LIVE PREVIEW
-         =============================== -->
-    <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const liveBtn = document.getElementById("toggle-live");
-      if (!liveBtn) return;
-
-      // ✅ Active le bouton uniquement sur la page questionnaire
-      const isQuestionPage = window.location.pathname === "/" || window.location.pathname.includes("index");
-
-      if (isQuestionPage) {
-        liveBtn.classList.remove("disabled");
-        liveBtn.addEventListener("click", () => {
-          const livePanel = document.getElementById("live-preview");
-          if (livePanel) livePanel.classList.toggle("visible");
+      document.addEventListener("DOMContentLoaded", () => {
+        const restart = document.getElementById("brand-restart");
+        restart?.addEventListener("click", () => {
+          if (window.location.pathname === "/") {
+            window.dispatchEvent(new CustomEvent("wilddrafter:restart"));
+            return;
+          }
+          window.location.href = "/";
         });
-      } else {
-        liveBtn.classList.add("disabled");
-      }
-    });
+
+        const liveBtn = document.getElementById("toggle-live");
+        if (!liveBtn) return;
+
+        const isQuestionPage = window.location.pathname === "/";
+        if (isQuestionPage) {
+          liveBtn.classList.remove("disabled");
+          liveBtn.addEventListener("click", () => {
+            document.getElementById("live-preview")?.classList.toggle("visible");
+          });
+        } else {
+          liveBtn.classList.add("disabled");
+        }
+      });
     </script>
-    
   </body>
 </html>

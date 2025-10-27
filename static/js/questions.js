@@ -1,274 +1,212 @@
-/* ============================================================
-   🔹 FICHIER : questions.js
-   🔹 RÔLE : Gère l'affichage du questionnaire, la collecte des réponses,
-             la progression, et la génération des résultats recommandés.
-   ============================================================ */
+/* ===========================================================================
+   Wild Drafter – Questionnaire principal (réécriture 2025)
+   Gère la navigation dans les questions, les réponses utilisateurs et
+   l'affichage des recommandations finales.
+   ======================================================================== */
 
+(() => {
+  const STORAGE_KEY = window.WILD_DRAFTER?.STORAGE_KEY ?? "wild_drafter.customChampions";
 
-/* ============================================================
-   #1 — UTILITAIRES FETCH (GET / POST JSON)
-   ------------------------------------------------------------
-   Fonctions génériques pour communiquer avec le backend Flask.
-   ============================================================ */
+  const qEl = document.getElementById("question");
+  const progressText = document.getElementById("progress-text");
+  const progressMeter = document.getElementById("progress-meter");
+  const qaBox = document.getElementById("qa-box");
+  const resultsBox = document.getElementById("results-box");
+  const resultsRoot = document.getElementById("results");
+  const btnYes = document.getElementById("btn-yes");
+  const btnNo = document.getElementById("btn-no");
+  const maxResultsSel = document.getElementById("max-results");
 
-async function getJSON(url) {
-  const res = await fetch(url);
-  return await res.json();
-}
+  const state = {
+    questions: [],
+    index: 0,
+    answers: {},
+  };
 
-async function postJSON(url, data) {
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(data)
-  });
-  return await res.json();
-}
-
-
-/* ============================================================
-   #2 — VARIABLES GLOBALES ET ÉLÉMENTS DOM
-   ------------------------------------------------------------
-   Variables nécessaires pour suivre la progression du quiz
-   et manipuler le DOM (barre, questions, résultats, etc.)
-   ============================================================ */
-
-let QUESTIONS = [];
-let answers = {};
-let idx = 0; // index de la question actuelle
-
-// Références DOM
-const qEl = document.getElementById("question");
-const progressText = document.getElementById("progress-text");
-const progressMeter = document.getElementById("progress-meter");
-const qaBox = document.getElementById("qa-box");
-const resultsBox = document.getElementById("results-box");
-const resultsRoot = document.getElementById("results");
-const btnYes = document.getElementById("btn-yes");
-const btnNo = document.getElementById("btn-no");
-const maxResultsSel = document.getElementById("max-results");
-
-
-/* ============================================================
-   #3 — PROGRESSION DU QUESTIONNAIRE
-   ------------------------------------------------------------
-   Met à jour la barre de progression et le texte associé.
-   ============================================================ */
-
-function updateProgress() {
-  const total = QUESTIONS.length;
-  const pct = Math.round((idx / total) * 100);
-  progressMeter.style.width = pct + "%";
-  const current = Math.min(idx + 1, total);
-  progressText.textContent = `Question ${current} / ${total}`;
-}
-
-
-/* ============================================================
-   #4 — AFFICHAGE D’UNE QUESTION
-   ------------------------------------------------------------
-   Affiche la question en cours, ou les résultats si terminé.
-   ============================================================ */
-
-function showQuestion() {
-  if (idx >= QUESTIONS.length) {
-    finalizeAndShowResults();
-    return;
+  function getLocalPayload() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : null;
+    } catch (error) {
+      console.warn("Impossible de charger le payload local", error);
+      return null;
+    }
   }
 
-  const current = QUESTIONS[idx];
-  qEl.textContent = current.text;
-  updateProgress();
-
-  // ✅ Ajout pour le Live Preview
-  window.currentQuestionKey = current.key;
-}
-
-/* ============================================================
-   #5 — AFFICHAGE DES RÉSULTATS
-   ------------------------------------------------------------
-   Génère dynamiquement les cartes champions avec leurs scores
-   et raisons correspondantes.
-   ============================================================ */
-
-function renderResults(items) {
-  resultsRoot.innerHTML = "";
-
-  // Aucun résultat
-  if (!items.length) {
-    resultsRoot.innerHTML = `
-      <div class="tip">
-        Aucun résultat avec ces réponses. Essaie de relancer avec d'autres choix.
-      </div>`;
-    return;
+  async function getJSON(url) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`GET ${url} → ${res.status}`);
+    return res.json();
   }
 
-  // Génération des cartes
-  for (const it of items) {
-    const card = document.createElement("div");
-    card.className = "card champion-card"; // 👈 ajout de la classe fade-in
-    card.innerHTML = `
-      <div class="icon-wrap">
-        <img class="icon" alt="${it.champion}" src="${it.icon}">
-      </div>
-      <div class="meta">
-        <div class="title">
-          <span>${it.champion}</span>
-          <span class="score">+${it.score}</span>
-        </div>
-        ${it.reasons?.length ? `
-        <div class="reasons">
-          ${it.reasons
-            .sort((a, b) => b.weight - a.weight)
-            .map(r => `
-              <span class="reason-tag weight-${r.weight}">
-                ${r.label}
-              </span>
-            `).join('')}
-        </div>` : ""}
-      </div>
-    `;
-    resultsRoot.appendChild(card);
-  }
+  async function postRecommendations(maxResults) {
+    const payload = getLocalPayload();
+    const body = {
+      answers: state.answers,
+      max_results: maxResults,
+    };
+    if (payload) {
+      body.payload = payload;
+    }
 
-  // ✨ Effet fade-in progressif des cartes
-  const cards = document.querySelectorAll('.champion-card');
-  setTimeout(() => {
-    cards.forEach((card, index) => {
-      setTimeout(() => card.classList.add('visible'), index * 80);
+    const res = await fetch("/recommend", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
     });
-  }, 100);
-}
-
-
-/* ============================================================
-   #6 — FINALISATION ET TRANSITION VERS LES RÉSULTATS
-   ------------------------------------------------------------
-   Animation de transition, récupération des résultats depuis
-   le backend, affichage final des champions recommandés.
-   ============================================================ */
-
-async function finalizeAndShowResults() {
-  const overlay = document.getElementById("transition-wrapper");
-
-  // Désactive les boutons pendant la transition
-  btnYes.disabled = true;
-  btnNo.disabled = true;
-
-  // Barre à 100 %
-  progressMeter.style.width = "100%";
-  progressMeter.classList.add("finish-glow");
-  progressText.textContent = `Question ${QUESTIONS.length} / ${QUESTIONS.length}`;
-
-  // Petite pause pour lisibilité
-  await new Promise(r => setTimeout(r, 250));
-
-  // Effet doré
-  overlay.classList.add("active");
-  await new Promise(r => setTimeout(r, 1000));
-
-  // Transition vers les résultats
-  qaBox.classList.add("hidden");
-  resultsBox.classList.remove("hidden");
-  resultsBox.classList.add("visible");
-
-  const max_results = maxResultsSel.value;
-  const data = await postJSON("/recommend", {answers, max_results});
-  renderResults(data);
-
-  // Dissipation du voile
-  await new Promise(r => setTimeout(r, 600));
-  overlay.classList.remove("active");
-
-  // Réinitialise l’état visuel
-  btnYes.disabled = false;
-  btnNo.disabled = false;
-  progressMeter.classList.remove("finish-glow");
-}
-
-
-/* ============================================================
-   #7 — LOGIQUE DE RÉPONSE UTILISATEUR
-   ------------------------------------------------------------
-   Gère le clic sur "Oui" ou "Non", stocke la réponse,
-   met à jour le Live Preview, puis passe à la question suivante.
-   ============================================================ */
-
-async function handleAnswer(value) {
-  const key = QUESTIONS[idx].key;
-
-  // Stockage pour les résultats finaux
-  answers[key] = value;
-
-  // ✅ Synchronisation Live Preview
-  if (!window.liveAnswers) window.liveAnswers = {};
-  window.liveAnswers[key] = value;
-
-  // ✅ Mise à jour instantanée du Live Preview
-  if (typeof updateLivePreview === "function") {
-    updateLivePreview();
+    if (!res.ok) throw new Error(`POST /recommend → ${res.status}`);
+    return res.json();
   }
 
-  // Passage à la question suivante
-  idx += 1;
+  function updateProgress() {
+    const total = state.questions.length || Q_COUNT || 1;
+    const current = Math.min(state.index + 1, total);
+    const ratio = Math.round((state.index / total) * 100);
+    progressMeter.style.width = `${ratio}%`;
+    progressText.textContent = `Question ${current} / ${total}`;
+  }
 
-  if (idx === QUESTIONS.length) {
+  function renderResults(items) {
+    resultsRoot.innerHTML = "";
+
+    if (!items.length) {
+      resultsRoot.innerHTML = `
+        <div class="tip">
+          Aucun résultat avec ces réponses. Essaie de relancer avec d'autres choix.
+        </div>`;
+      return;
+    }
+
+    items.forEach((item, index) => {
+      const card = document.createElement("div");
+      card.className = "card champion-card";
+      card.innerHTML = `
+        <div class="icon-wrap">
+          <img class="icon" alt="${item.champion}" src="${item.icon}">
+        </div>
+        <div class="meta">
+          <div class="title">
+            <span>${item.champion}</span>
+            <span class="score">+${item.score}</span>
+          </div>
+          ${item.reasons?.length ? `
+          <div class="reasons">
+            ${item.reasons
+              .map((reason) => `
+                <span class="reason-tag weight-${reason.weight}">
+                  ${reason.label}
+                </span>`)
+              .join("")}
+          </div>` : ""}
+        </div>`;
+      resultsRoot.appendChild(card);
+
+      setTimeout(() => card.classList.add("visible"), index * 80);
+    });
+  }
+
+  async function finalizeQuiz() {
+    btnYes.disabled = true;
+    btnNo.disabled = true;
+
+    progressMeter.style.width = "100%";
+    progressMeter.classList.add("finish-glow");
+    progressText.textContent = `Question ${state.questions.length} / ${state.questions.length}`;
+
+    await new Promise((resolve) => setTimeout(resolve, 250));
+
+    const overlay = document.getElementById("transition-wrapper");
+    overlay?.classList.add("active");
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    qaBox.classList.add("hidden");
+    resultsBox.classList.remove("hidden");
+    resultsBox.classList.add("visible");
+
+    const maxResults = Number(maxResultsSel.value || 6);
+    const data = await postRecommendations(maxResults);
+    renderResults(data);
+
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    overlay?.classList.remove("active");
+
+    btnYes.disabled = false;
+    btnNo.disabled = false;
+    progressMeter.classList.remove("finish-glow");
+  }
+
+  function showQuestion() {
+    if (state.index >= state.questions.length) {
+      finalizeQuiz();
+      return;
+    }
+
+    const current = state.questions[state.index];
+    qEl.textContent = current.text;
     updateProgress();
-    await finalizeAndShowResults();
-    return;
+
+    window.currentQuestionKey = current.key;
   }
 
-  showQuestion();
-}
+  function syncLivePreview(options = {}) {
+    if (typeof window.updateLivePreview === "function") {
+      window.updateLivePreview(state.answers, options);
+    }
+    window.liveAnswers = { ...state.answers };
+  }
 
-/* ============================================================
-   #8 — GESTION DES ÉVÉNEMENTS UTILISATEUR
-   ------------------------------------------------------------
-   Boutons Oui/Non, redémarrage du quiz, changement du
-   nombre max de résultats affichés.
-   ============================================================ */
+  async function handleAnswer(value) {
+    const question = state.questions[state.index];
+    if (!question) return;
 
-btnYes.addEventListener("click", () => handleAnswer(true));
-btnNo.addEventListener("click", () => handleAnswer(false));
+    state.answers[question.key] = value;
+    syncLivePreview();
 
-document.getElementById("brand-restart").addEventListener("click", () => {
-  answers = {};
-  idx = 0;
-  resultsBox.classList.add("hidden");
-  qaBox.classList.remove("hidden");
-  progressMeter.style.width = "0%";
-  updateProgress();
-  showQuestion();
-  window.scrollTo({top: 0, behavior: "smooth"});
-});
+    state.index += 1;
+    if (state.index >= state.questions.length) {
+      await finalizeQuiz();
+      return;
+    }
 
-// ✅ Réinitialise le Live Preview
-const preview = document.getElementById("results-list");
-if (preview) preview.innerHTML = "";
-if (window.liveAnswers) window.liveAnswers = {};
+    showQuestion();
+  }
 
+  function resetQuiz() {
+    state.index = 0;
+    state.answers = {};
+    resultsBox.classList.add("hidden");
+    qaBox.classList.remove("hidden");
+    resultsRoot.innerHTML = "";
+    progressMeter.style.width = "0%";
+    updateProgress();
+    showQuestion();
+    syncLivePreview({ reset: true });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
 
-// Gestion des tops 3, 6, 10
-maxResultsSel.addEventListener("change", async () => {
-  if (resultsBox.classList.contains("hidden")) return;
-  const max_results = maxResultsSel.value;
-  const data = await postJSON("/recommend", {answers, max_results});
-  renderResults(data);
-});
+  function registerEvents() {
+    btnYes?.addEventListener("click", () => handleAnswer(true));
+    btnNo?.addEventListener("click", () => handleAnswer(false));
 
+    maxResultsSel?.addEventListener("change", async () => {
+      const maxResults = Number(maxResultsSel.value || 6);
+      if (!resultsBox.classList.contains("hidden")) {
+        const data = await postRecommendations(maxResults);
+        renderResults(data);
+      }
+      syncLivePreview({ maxResults });
+    });
 
-/* ============================================================
-   #9 — INITIALISATION AU CHARGEMENT DE LA PAGE
-   ------------------------------------------------------------
-   Charge la liste de questions depuis le backend et démarre
-   le questionnaire à la première question.
-   ============================================================ */
+    window.addEventListener("wilddrafter:restart", () => {
+      resetQuiz();
+    });
+  }
 
-(async () => {
-  QUESTIONS = await getJSON("/questions");
-  idx = 0;
-  answers = {};
-  progressMeter.style.width = "0%";
-  updateProgress();
-  showQuestion();
+  (async () => {
+    registerEvents();
+    state.questions = await getJSON("/questions");
+    resetQuiz();
+  })().catch((error) => console.error("Initialisation questionnaire impossible", error));
 })();

@@ -2,24 +2,29 @@
 
 {% block content %}
 <section class="panel centered admin-panel">
-  <h2 class="h2" style="margin-bottom: 20px;">Gestion des Champions</h2>
+  <h2 class="h2" style="margin-bottom: 20px;">Gestion des champions</h2>
 
   <div class="admin-buttons">
     <button id="add-champ" class="btn">+ Ajouter un champion</button>
-    <button id="save-changes" class="btn btn-ghost">💾 Sauvegarder</button>
+    <button id="save-changes" class="btn btn-ghost">💾 Sauvegarder localement</button>
+    <button id="reset-data" class="btn btn-ghost">↩️ Restaurer la base</button>
+    <button id="export-payload" class="btn btn-ghost">📦 Exporter / Proposer</button>
     <button id="toggle-delete" class="btn btn-ghost">🗑️ Mode suppression</button>
   </div>
 
-  <!-- Grille des champions -->
+  <p class="tip" style="margin-top: 16px;">
+    Les modifications sont enregistrées dans ton navigateur uniquement. Exporter te permet
+    de partager une proposition sans impacter les autres utilisateurs.
+  </p>
+
   <div id="admin-grid" class="admin-grid"></div>
 </section>
 
-<!-- Modale d'ajout de champion (cachée par défaut) -->
-<div id="admin-modal" class="admin-overlay hidden">
+<div id="admin-modal" class="admin-overlay hidden" role="dialog" aria-modal="true">
   <div class="admin-modal">
     <h3>Ajouter un champion</h3>
 
-    <label>Nom du champion :</label>
+    <label for="champ-name">Nom du champion :</label>
     <input id="champ-name" class="admin-input" placeholder="Ex: Bel'Veth">
 
     <div class="admin-attrs" id="attrs-container">
@@ -31,6 +36,14 @@
       {% endfor %}
     </div>
 
+    <label for="champ-icon" style="margin-top:12px;">Icône personnalisée (URL) :</label>
+    <input id="champ-icon" class="admin-input" placeholder="https://…">
+
+    <label class="admin-attr" style="margin-top:12px;">
+      <input type="checkbox" id="champ-icon-placeholder">
+      Utiliser l'icône placeholder (default.png)
+    </label>
+
     <div class="admin-modal-actions">
       <button id="cancel-add" class="btn btn-ghost">Annuler</button>
       <button id="confirm-add" class="btn">Sauvegarder</button>
@@ -40,260 +53,11 @@
 {% endblock %}
 
 {% block scripts %}
-
 <script>
-document.addEventListener("DOMContentLoaded", () => {
-
-  // --- RÉFÉRENCES GLOBALES ---
-  const gridEl   = document.getElementById("admin-grid");
-  const addBtn   = document.getElementById("add-champ");
-  const saveBtn  = document.getElementById("save-changes");
-  const modalEl  = document.getElementById("admin-modal");
-  const cancelEl = document.getElementById("cancel-add");
-  const confirmEl= document.getElementById("confirm-add");
-  const nameEl   = document.getElementById("champ-name");
-
-  // --- MODE SUPPRESSION ---
-const toggleDeleteBtn = document.getElementById("toggle-delete");
-let deleteMode = false;
-
-toggleDeleteBtn.addEventListener("click", () => {
-  deleteMode = !deleteMode;
-  toggleDeleteBtn.classList.toggle("active", deleteMode);
-  toggleDeleteBtn.textContent = deleteMode ? "❌ Quitter mode suppression" : "🗑️ Mode suppression";
-
-  document.querySelectorAll(".admin-card").forEach(card => {
-    if (deleteMode) card.classList.add("delete-mode");
-    else card.classList.remove("delete-mode");
-  });
-});
-
-
-  // --- DONNÉES INITIALES ---
-  let ATTR_LABELS = {};
-  try { ATTR_LABELS = {{ reason_labels | tojson | safe }} || {}; } catch(e) {}
-  let ATTR_WEIGHTS = {};
-  try { ATTR_WEIGHTS = {{ reason_weights | tojson | safe }} || {}; } catch(e) { ATTR_WEIGHTS = {}; }
-  let champions = undefined;
-  try { champions = {{ champions | tojson | safe }}; } catch(e) {}
-
-  // --- ÉTAT DE MODIFICATION ---
-  let hasUnsavedChanges = false;
-  function markUnsaved() {
-    hasUnsavedChanges = true;
-    saveBtn?.classList.add("unsaved");
-  }
-  function markSaved() {
-    hasUnsavedChanges = false;
-    saveBtn?.classList.remove("unsaved");
-  }
-
-  // --- TABLE DES NOMS SPÉCIAUX (Riot) ---
-  const ICON_OVERRIDES = {
-    "Wukong": "MonkeyKing",
-    "Renata Glasc": "Renata",
-    "Kha'Zix": "Khazix",
-    "Cho'Gath": "Chogath",
-    "Vel'Koz": "Velkoz",
-    "Kai'Sa": "Kaisa",
-    "LeBlanc": "Leblanc",
-    "Nunu & Willump": "Nunu",
-    "Dr. Mundo": "DrMundo",
-    "Miss Fortune": "MissFortune",
-    "Tahm Kench": "TahmKench",
-    "Twisted Fate": "TwistedFate",
-    "Jarvan IV": "JarvanIV",
-    "Xin Zhao": "XinZhao",
-    "Aurelion Sol": "AurelionSol",
-    "Kog'Maw": "KogMaw",
-    "Rek'Sai": "RekSai",
-    "Bel'Veth": "Belveth",
-    "K'Sante": "KSante",
-    "Lee Sin": "LeeSin",
-    "Master Yi": "MasterYi",
-    "Renécton": "Renekton",
-    "Dr Mundo": "DrMundo",
-    "ChoGath": "Chogath"
-  };
-
-  // --- CONSTRUCTION D'UNE URL D'ICÔNE ---
-  function buildRiotIconUrl(inputName) {
-    if (!inputName) return "";
-    const clean = inputName
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
-      .replace(/['.]/g, "")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    const override = ICON_OVERRIDES[clean];
-    let key = override || clean.replace(/\s+/g, "");
-    key = key.charAt(0).toUpperCase() + key.slice(1);
-    return `https://ddragon.leagueoflegends.com/cdn/14.23.1/img/champion/${key}.png`;
-  }
-
-  // --- RENDU DE LA GRILLE DES CHAMPIONS ---
-  function refreshGrid() {
-    if (!gridEl) return;
-    gridEl.innerHTML = "";
-
-    const names = Object.keys(champions || {}).sort();
-    for (const name of names) {
-      const champ = champions[name] || {};
-      const card  = document.createElement("div");
-      card.className = "admin-card";
-
-      // bouton supprimer
-      const del = document.createElement("div");
-      del.className = "admin-delete";
-      del.innerHTML = "✕";
-      del.title = "Supprimer ce champion";
-      del.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (!confirm(`Supprimer ${name} ?`)) return;
-        delete champions[name];
-        markUnsaved();
-        refreshGrid();
-      });
-      card.appendChild(del);
-
-      // image
-      const img = document.createElement("img");
-      img.src = champ.icon || buildRiotIconUrl(name);
-      img.alt = name;
-      img.referrerPolicy = "no-referrer";
-      img.onerror = () => { img.style.filter = "grayscale(1) brightness(0.6)"; };
-
-      // nom
-      const nameDiv = document.createElement("div");
-      nameDiv.className = "admin-name";
-      nameDiv.textContent = name;
-
-// tooltip attributs
-const tip = document.createElement("div");
-tip.className = "admin-tooltip";
-
-// on prend uniquement les clés actives
-let keys = Object.keys(champ).filter(k => champ[k] === true && ATTR_LABELS[k]);
-
-// trie les attributs verts (weight=2) en premier
-keys.sort((a, b) => (ATTR_WEIGHTS[b] || 1) - (ATTR_WEIGHTS[a] || 1));
-
-// chaque clé est colorée selon son poids défini dans app.py
-tip.innerHTML = keys.length
-  ? keys.map(k => {
-      const weight = ATTR_WEIGHTS[k] || 1; // récupère le vrai poids
-      const cls = weight === 2 ? "w2" : "w1"; // 2 = vert, 1 = bleu
-      return `<div class="attr-chip ${cls}">${ATTR_LABELS[k]}</div>`;
-    }).join("")
-  : "";
-
-      card.appendChild(img);
-      card.appendChild(nameDiv);
-      card.appendChild(tip);
-      gridEl.appendChild(card);
-    }
-  }
-
-  // --- MODALE ---
-  function openModal() {
-    modalEl.classList.remove("hidden");
-    modalEl.removeAttribute("hidden");
-    nameEl.value = "";
-    nameEl.focus();
-  }
-  function closeModal() {
-    modalEl.classList.add("hidden");
-    modalEl.setAttribute("hidden", "");
-    document.querySelectorAll(".attr-checkbox").forEach(cb => cb.checked = false);
-  }
-
-  addBtn.addEventListener("click", openModal);
-  cancelEl.addEventListener("click", closeModal);
-  modalEl.addEventListener("click", (e) => { if (e.target === modalEl) closeModal(); });
-
-  // --- CHARGEMENT CHAMPIONS ---
-  async function ensureChampionsLoaded() {
-    if (champions && typeof champions === "object") return;
-    const res = await fetch("/api/champions");
-    champions = await res.json();
-  }
-
-  // --- AJOUT D'UN CHAMPION ---
-  confirmEl.addEventListener("click", async () => {
-    await ensureChampionsLoaded();
-    const name = nameEl.value.trim();
-    if (!name) return alert("Nom du champion requis");
-
-    const meta = {};
-    document.querySelectorAll(".attr-checkbox").forEach(cb => {
-      meta[cb.dataset.key] = cb.checked;
-    });
-    meta.icon = buildRiotIconUrl(name);
-    champions[name] = meta;
-    markUnsaved();
-
-    closeModal();
-    refreshGrid();
-  });
-
-  // --- SAUVEGARDE ---
-  saveBtn.addEventListener("click", async () => {
-  await ensureChampionsLoaded();
-  await fetch("/api/champions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(champions)
-  });
-  markSaved();
-  flashSavedEffect(); // 👈 effet visuel au lieu du popup
-});
-
-function flashSavedEffect() {
-  const panel = document.querySelector(".admin-panel");
-  if (!panel) return;
-
-  panel.classList.add("saved-flash");
-  setTimeout(() => {
-    panel.classList.remove("saved-flash");
-  }, 1500);
-}
-
-  // --- INIT ---
-  (async () => {
-    await ensureChampionsLoaded();
-    refreshGrid();
-    closeModal();
-  })();
-});
-
-const ATTR_LABELS = {{ reason_labels | tojson | safe }};
-let GLOBAL_CHAMPIONS = {{ champions | tojson | safe }}; // ceux du serveur
-let USER_CHAMPIONS = JSON.parse(localStorage.getItem("user_champions")) || GLOBAL_CHAMPIONS;
-
-// --- Fonction pour sauvegarder localement ---
-function saveLocalChampions() {
-  localStorage.setItem("user_champions", JSON.stringify(USER_CHAMPIONS));
-}
-
-// --- Exemple : affichage de la liste ---
-function renderChampionList() {
-  const list = document.getElementById("champions-list");
-  list.innerHTML = "";
-  USER_CHAMPIONS.forEach(champ => {
-    const div = document.createElement("div");
-    div.className = "champ-card";
-    div.innerHTML = `
-      <img src="${champ.icon}" class="champ-icon">
-      <span>${champ.name}</span>
-    `;
-    list.appendChild(div);
-  });
-}
-
-// --- Sauvegarde manuelle ---
-document.getElementById("save-changes").addEventListener("click", saveLocalChampions);
-
-// --- Chargement initial ---
-renderChampionList();
+  window.__SERVER_CHAMPIONS__ = {{ champions | tojson | safe }};
+  window.__REASON_LABELS__ = {{ reason_labels | tojson | safe }};
+  window.__REASON_WEIGHTS__ = {{ reason_weights | tojson | safe }};
+  window.__DEFAULT_ICON__ = "{{ default_icon }}";
 </script>
+<script src="{{ url_for('static', filename='js/admin.js') }}"></script>
 {% endblock %}
