@@ -31,6 +31,28 @@ body {
 .header { background: linear-gradient(90deg,#0f1623,#151e2d); border-bottom: 1px solid #1f2b3b; }
 .footer { border-top: 1px solid #1f2b3b; color: var(--muted); }
 
+/* Footer collé en bas sans casser la mise en page */
+body {
+  position: relative;
+  min-height: 100vh;
+}
+
+footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+}
+
+footer .container {
+  padding: 8px 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  background: transparent;
+}
+
+
 /* === Logo + Titre clickable === */
 .clickable {
   cursor: pointer;
@@ -850,4 +872,207 @@ html { scroll-behavior: smooth; }
 .admin-panel.saved-flash {
   animation: flash-green 1.5s ease-in-out;
   border-radius: 12px;
+}
+
+/* Texte placeholder du Live Preview */
+.live-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;   /* centre verticalement */
+  align-items: center;       /* centre horizontalement */
+  text-align: center;
+  height: 100%;              /* prend toute la hauteur du live preview */
+  opacity: 0.7;
+  font-size: 13px;
+  color: var(--muted);
+  padding: 20px 10px;
+  line-height: 1.5;
+  user-select: none;
+}
+.live-placeholder p {
+  margin: 0;
+}
+
+
+/* === Bouton Live Preview global === */
+.btn-live {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.1);
+  color: #dddddd;
+  border-radius: 12px;
+  padding: 8px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.btn-live:hover:not(.disabled) {
+  background: rgba(255,255,255,0.12);
+  box-shadow: 0 0 12px rgba(255,215,0,0.1);
+  transform: translateY(-1px);
+}
+
+/* État désactivé (pages non-index) */
+.btn-live.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: grayscale(1);
+}
+
+/* Désactive l'animation du point rouge si le bouton est désactivé */
+.btn-live.disabled .live-dot {
+  animation: none;
+  background: #777; /* gris doux */
+  box-shadow: none;
+  opacity: 0.6;
+  filter: grayscale(1);
+}
+
+/* === Live Preview — Compact, fluide et scrollable sans scrollbar === */
+#live-preview {
+  position: fixed;
+  top: 119px;
+  right: 180px;
+  width: 320px;
+
+  /* ÉTAT FERMÉ (valeurs de départ) */
+  transform: translateX(40px) scale(0.98);
+  opacity: 0;
+  max-height: 0;           /* ferme visuellement */
+  overflow: hidden;        /* cache le contenu fermé */
+
+  background: rgba(13, 23, 41, 0.44);
+  border: 1px solid #1f2b3b;
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 0 25px rgba(0,0,0,0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  z-index: 2000;
+
+  /* ✅ TRANSITIONS : NE PAS RÉÉCRASER AILLEURS */
+  transition:
+    transform 0.45s cubic-bezier(0.25, 1, 0.5, 1),
+    opacity 0.45s ease,
+    max-height 0.5s ease;
+
+  /* Masquer totalement les barres de scroll */
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE/Edge */
+}
+#live-preview::-webkit-scrollbar { display: none; }
+
+/* === ÉTAT OUVERT === */
+#live-preview.visible {
+  transform: translateX(0) scale(1);
+  opacity: 1;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;        /* scroll interne */
+  min-height: 175px;       /* mets la min-height ici (ou enlève si tu veux) */
+}
+
+/* === Indicateur "Live" rouge animé === */
+.live-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: 0.3px;
+  color: var(--text);
+}
+
+.live-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ff3b30; /* rouge vif */
+  box-shadow: 0 0 8px rgba(255, 60, 60, 0.7);
+  animation: pulseLive 1.8s ease-in-out infinite;
+}
+
+/* Animation de respiration */
+@keyframes pulseLive {
+  0%   { transform: scale(1);   box-shadow: 0 0 6px rgba(255, 60, 60, 0.6); }
+  50%  { transform: scale(1.35); box-shadow: 0 0 18px rgba(255, 60, 60, 0.9); }
+  100% { transform: scale(1);   box-shadow: 0 0 6px rgba(255, 60, 60, 0.6); }
+}
+
+/* Quand il y a du contenu (donc “ouvert”) */
+#live-preview.active {
+  max-height: 80vh; /* la hauteur maximale animée */
+  overflow-y: auto;  /* autorise le scroll une fois ouverte */
+}
+
+#live-preview h3 {
+  margin-top: 0;
+  margin-bottom: 12px;
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-align: center;
+  color: #ffd97a;
+}
+
+.results-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Cartes champion cohérentes avec le style des résultats */
+.champion-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(0,0,0,0.15));
+  border: 1px solid #1f2b3b;
+  border-radius: 12px;
+  padding: 8px 10px;
+  transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1),
+              opacity 0.4s ease;
+  will-change: transform, opacity;
+  opacity: 0;
+  transform: translateY(6px);
+}
+.champion-card.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+.champion-card:hover {
+  background: rgba(255,255,255,0.08);
+  border-color: rgba(255, 215, 0, 0.3);
+  transform: translateY(-2px);
+}
+
+/* Icône du champion — mini version propre */
+.champion-card img {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  object-fit: cover;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5));
+}
+
+/* Texte */
+.champion-name {
+  flex: 1;
+  font-weight: 700;
+  font-size: 14px;
+  color: #eaeff7;
+}
+.champion-score {
+  color: #7dd3fc;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Texte “aucun résultat” */
+#results-list p {
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
 }

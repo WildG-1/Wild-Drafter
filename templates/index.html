@@ -51,8 +51,21 @@
     <!-- Zone où les résultats seront injectés en JS -->
     <div id="results" class="results"></div>
   </div>
-
 </section>
+
+<!-- ===============================
+     SECTION SECONDAIRE : Live Preview
+     =============================== -->
+     
+<aside id="live-preview" class="panel">
+  <h2 class="h2 live-title">
+    <span class="live-dot"></span>
+    Live Preview
+  </h2>
+  <div id="results-list" class="results-grid"></div>
+</aside>
+
+
 {% endblock %}
 
 {% block scripts %}
@@ -65,6 +78,8 @@
 const Q_COUNT = {{ q_count }};
 </script>
 
-<!-- Script principal du questionnaire -->
+<!-- Scripts questionnaire et live preview -->
 <script src="{{ url_for('static', filename='js/questions.js') }}"></script>
+<script src="{{ url_for('static', filename='js/livePreview.js') }}"></script>
+
 {% endblock %}

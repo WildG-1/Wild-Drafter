@@ -75,10 +75,14 @@ function showQuestion() {
     finalizeAndShowResults();
     return;
   }
-  qEl.textContent = QUESTIONS[idx].text;
-  updateProgress();
-}
 
+  const current = QUESTIONS[idx];
+  qEl.textContent = current.text;
+  updateProgress();
+
+  // ✅ Ajout pour le Live Preview
+  window.currentQuestionKey = current.key;
+}
 
 /* ============================================================
    #5 — AFFICHAGE DES RÉSULTATS
@@ -187,12 +191,25 @@ async function finalizeAndShowResults() {
    #7 — LOGIQUE DE RÉPONSE UTILISATEUR
    ------------------------------------------------------------
    Gère le clic sur "Oui" ou "Non", stocke la réponse,
-   passe à la suivante ou affiche les résultats finaux.
+   met à jour le Live Preview, puis passe à la question suivante.
    ============================================================ */
 
 async function handleAnswer(value) {
   const key = QUESTIONS[idx].key;
+
+  // Stockage pour les résultats finaux
   answers[key] = value;
+
+  // ✅ Synchronisation Live Preview
+  if (!window.liveAnswers) window.liveAnswers = {};
+  window.liveAnswers[key] = value;
+
+  // ✅ Mise à jour instantanée du Live Preview
+  if (typeof updateLivePreview === "function") {
+    updateLivePreview();
+  }
+
+  // Passage à la question suivante
   idx += 1;
 
   if (idx === QUESTIONS.length) {
@@ -203,7 +220,6 @@ async function handleAnswer(value) {
 
   showQuestion();
 }
-
 
 /* ============================================================
    #8 — GESTION DES ÉVÉNEMENTS UTILISATEUR
@@ -226,6 +242,13 @@ document.getElementById("brand-restart").addEventListener("click", () => {
   window.scrollTo({top: 0, behavior: "smooth"});
 });
 
+// ✅ Réinitialise le Live Preview
+const preview = document.getElementById("results-list");
+if (preview) preview.innerHTML = "";
+if (window.liveAnswers) window.liveAnswers = {};
+
+
+// Gestion des tops 3, 6, 10
 maxResultsSel.addEventListener("change", async () => {
   if (resultsBox.classList.contains("hidden")) return;
   const max_results = maxResultsSel.value;

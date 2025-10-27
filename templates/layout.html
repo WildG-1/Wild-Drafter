@@ -47,14 +47,25 @@
           </div>
         </div>
 
-        <!-- Icône d’accès à la page d’administration -->
-        <div
-          class="admin-icon-wrap"
-          onclick="window.location.href='/admin'"
-          title="Administration"
-        >
-          <span class="admin-emoji">⚙️</span>
-        </div>
+        <!-- 🔧 Bouton Live Preview + Icône Admin -->
+<div class="header-right" style="display: flex; align-items: center; gap: 16px;">
+  
+  <!-- 🔴 Bouton Live Preview global -->
+  <button id="toggle-live" class="btn-live disabled" title="Live Preview">
+    <span class="live-dot"></span>
+    Live Preview
+  </button>
+
+  <!-- ⚙️ Icône d’accès à la page d’administration -->
+  <div
+    class="admin-icon-wrap"
+    onclick="window.location.href='/admin'"
+    title="Administration"
+  >
+    <span class="admin-emoji">⚙️</span>
+  </div>
+
+</div>
 
       </div>
     </header>
@@ -98,5 +109,26 @@
       }
     });
     </script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+  const liveBtn = document.getElementById("toggle-live");
+  if (!liveBtn) return;
+
+  // ✅ Active le bouton uniquement sur la page questionnaire
+  const isQuestionPage = window.location.pathname === "/" || window.location.pathname.includes("index");
+
+  if (isQuestionPage) {
+    liveBtn.classList.remove("disabled");
+    liveBtn.addEventListener("click", () => {
+      const livePanel = document.getElementById("live-preview");
+      if (livePanel) livePanel.classList.toggle("visible");
+    });
+  } else {
+    liveBtn.classList.add("disabled");
+  }
+});
+</script>
+
   </body>
 </html>
