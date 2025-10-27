@@ -125,6 +125,10 @@ def recommend():
     scored.sort(key=lambda x: x["score"], reverse=True)
     return jsonify(scored[:max_results])
 
+@app.route("/changelog")
+def changelog():
+    return render_template("changelog.html")
+
 # ================================================================
 #  🔐 ADMIN
 # ================================================================

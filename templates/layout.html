@@ -11,16 +11,58 @@
     <!-- ===============================
          POLICES ET STYLES
          =============================== -->
-    <!-- Préchargement des polices Google -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <!-- Police principale : Inter (400, 600, 800) -->
     <link
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap"
       rel="stylesheet"
     >
-    <!-- Feuille de style principale -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+    <!-- ===============================
+         TRANSITIONS ENTRE PAGES (Cross-Document View Transition)
+         =============================== -->
+    <style>
+      /* Active les transitions natives */
+      @view-transition { navigation: auto; }
+
+      /* Empêche le body complet d'être animé */
+      :root { view-transition-name: none; }
+
+      /* Le container principal : seul élément animé entre les pages */
+      main.container {
+        contain: view-transition;
+        view-transition-name: page;
+      }
+
+      /* Animation fluide sur le container */
+      html::view-transition-old(page),
+      html::view-transition-new(page) {
+        animation-duration: .32s;
+        animation-timing-function: cubic-bezier(.2, .6, .2, 1);
+      }
+
+      @keyframes fade-slide-out {
+        from { opacity: 1; transform: translateY(0) scale(1); }
+        to   { opacity: 0; transform: translateY(6px) scale(.98); }
+      }
+
+      @keyframes fade-slide-in {
+        from { opacity: 0; transform: translateY(6px) scale(.98); }
+        to   { opacity: 1; transform: translateY(0) scale(1); }
+      }
+
+      html::view-transition-old(page) { animation-name: fade-slide-out; }
+      html::view-transition-new(page) { animation-name: fade-slide-in; }
+
+      /* Accessibilité : pas d’animation pour ceux qui réduisent le mouvement */
+      @media (prefers-reduced-motion: reduce) {
+        html::view-transition-old(page),
+        html::view-transition-new(page) {
+          animation: none !important;
+        }
+      }
+    </style>
   </head>
 
   <body class="dark">
@@ -47,32 +89,47 @@
           </div>
         </div>
 
-        <!-- 🔧 Bouton Live Preview + Icône Admin -->
-<div class="header-right" style="display: flex; align-items: center; gap: 16px;">
-  
-  <!-- 🔴 Bouton Live Preview global -->
-  <button id="toggle-live" class="btn-live disabled" title="Live Preview">
-    <span class="live-dot"></span>
-    Live Preview
-  </button>
+        <!-- 🔧 Boutons : Live Preview / Admin / Changelog -->
+        <div class="header-right">
+          <!-- 🔴 Bouton Live Preview global -->
+          <button id="toggle-live" class="btn-live disabled" title="Live Preview">
+            <span class="live-dot"></span>
+            Live Preview
+          </button>
 
-  <!-- ⚙️ Icône d’accès à la page d’administration -->
-  <div
-    class="admin-icon-wrap"
-    onclick="window.location.href='/admin'"
-    title="Administration"
-  >
-    <span class="admin-emoji">⚙️</span>
-  </div>
+          <!-- ⚙️ Icône Administration -->
+          <button
+            class="icon-circle"
+            type="button"
+            title="Administration"
+            aria-label="Ouvrir l’administration"
+            onclick="window.location.href='/admin'"
+          >
+            <span class="admin-emoji" aria-hidden="true">⚙️</span>
+          </button>
 
-</div>
-
+          <!-- 🗒️ Icône Changelog -->
+          <a
+            href="{{ url_for('changelog') }}"
+            class="icon-circle changelog-btn"
+            title="Changelog"
+            aria-label="Ouvrir le changelog"
+          >
+            <svg class="changelog-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="6" cy="7" r="1.6"></circle>
+              <circle cx="6" cy="12" r="1.6"></circle>
+              <circle cx="6" cy="17" r="1.6"></circle>
+              <rect x="10" y="6"  width="8" height="2" rx="1"></rect>
+              <rect x="10" y="11" width="8" height="2" rx="1"></rect>
+              <rect x="10" y="16" width="8" height="2" rx="1"></rect>
+            </svg>
+          </a>
+        </div>
       </div>
     </header>
 
     <!-- ===============================
          CONTENU PRINCIPAL
-         (rempli dynamiquement selon la page)
          =============================== -->
     <main class="container">
       {% block content %}{% endblock %}
@@ -83,7 +140,7 @@
          =============================== -->
     <footer class="footer">
       <div class="container">
-        <span>🛠️ Wild x ChatGPT - {{ 2025 }} </span>
+        <span>🛠️ Wild x ChatGPT - {{ 2025 }}</span>
       </div>
     </footer>
 
@@ -93,13 +150,12 @@
     {% block scripts %}{% endblock %}
 
     <!-- ===============================
-         TRANSITION / ANIMATION (placeholder)
+         WRAPPER DE TRANSITION (facultatif)
          =============================== -->
     <div id="transition-wrapper" class="transition-wrapper"></div>
 
     <!-- ===============================
          SCRIPT GÉNÉRAL DE NAVIGATION
-         (redirection au clic sur le logo)
          =============================== -->
     <script>
     document.addEventListener("DOMContentLoaded", () => {
@@ -110,25 +166,28 @@
     });
     </script>
 
-<script>
-document.addEventListener("DOMContentLoaded", () => {
-  const liveBtn = document.getElementById("toggle-live");
-  if (!liveBtn) return;
+    <!-- ===============================
+         SCRIPT DE GESTION DU LIVE PREVIEW
+         =============================== -->
+    <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const liveBtn = document.getElementById("toggle-live");
+      if (!liveBtn) return;
 
-  // ✅ Active le bouton uniquement sur la page questionnaire
-  const isQuestionPage = window.location.pathname === "/" || window.location.pathname.includes("index");
+      // ✅ Active le bouton uniquement sur la page questionnaire
+      const isQuestionPage = window.location.pathname === "/" || window.location.pathname.includes("index");
 
-  if (isQuestionPage) {
-    liveBtn.classList.remove("disabled");
-    liveBtn.addEventListener("click", () => {
-      const livePanel = document.getElementById("live-preview");
-      if (livePanel) livePanel.classList.toggle("visible");
+      if (isQuestionPage) {
+        liveBtn.classList.remove("disabled");
+        liveBtn.addEventListener("click", () => {
+          const livePanel = document.getElementById("live-preview");
+          if (livePanel) livePanel.classList.toggle("visible");
+        });
+      } else {
+        liveBtn.classList.add("disabled");
+      }
     });
-  } else {
-    liveBtn.classList.add("disabled");
-  }
-});
-</script>
-
+    </script>
+    
   </body>
 </html>

@@ -933,15 +933,15 @@ html { scroll-behavior: smooth; }
 /* === Live Preview — Compact, fluide et scrollable sans scrollbar === */
 #live-preview {
   position: fixed;
-  top: 119px;
-  right: 180px;
+  top: 24px;
+  right: -320px;
   width: 320px;
 
-  /* ÉTAT FERMÉ (valeurs de départ) */
+  /* État fermé par défaut */
   transform: translateX(40px) scale(0.98);
   opacity: 0;
-  max-height: 0;           /* ferme visuellement */
-  overflow: hidden;        /* cache le contenu fermé */
+  max-height: 0;
+  overflow: hidden;
 
   background: rgba(13, 23, 41, 0.44);
   border: 1px solid #1f2b3b;
@@ -952,25 +952,24 @@ html { scroll-behavior: smooth; }
   -webkit-backdrop-filter: blur(12px);
   z-index: 2000;
 
-  /* ✅ TRANSITIONS : NE PAS RÉÉCRASER AILLEURS */
   transition:
     transform 0.45s cubic-bezier(0.25, 1, 0.5, 1),
     opacity 0.45s ease,
-    max-height 0.5s ease;
+    max-height 0.45s ease;
 
-  /* Masquer totalement les barres de scroll */
-  scrollbar-width: none;        /* Firefox */
-  -ms-overflow-style: none;     /* IE/Edge */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 #live-preview::-webkit-scrollbar { display: none; }
 
 /* === ÉTAT OUVERT === */
 #live-preview.visible {
+  right: -320px; /* optionnel si tu veux un léger offset */
   transform: translateX(0) scale(1);
   opacity: 1;
   max-height: calc(100vh - 140px);
-  overflow-y: auto;        /* scroll interne */
-  min-height: 175px;       /* mets la min-height ici (ou enlève si tu veux) */
+  overflow-y: auto;
+  min-height: 0px;
 }
 
 /* === Indicateur "Live" rouge animé === */
@@ -988,24 +987,18 @@ html { scroll-behavior: smooth; }
   width: 10px;
   height: 10px;
   border-radius: 50%;
-  background: #ff3b30; /* rouge vif */
+  background: #ff3b30;
   box-shadow: 0 0 8px rgba(255, 60, 60, 0.7);
   animation: pulseLive 1.8s ease-in-out infinite;
 }
 
-/* Animation de respiration */
 @keyframes pulseLive {
   0%   { transform: scale(1);   box-shadow: 0 0 6px rgba(255, 60, 60, 0.6); }
   50%  { transform: scale(1.35); box-shadow: 0 0 18px rgba(255, 60, 60, 0.9); }
   100% { transform: scale(1);   box-shadow: 0 0 6px rgba(255, 60, 60, 0.6); }
 }
 
-/* Quand il y a du contenu (donc “ouvert”) */
-#live-preview.active {
-  max-height: 80vh; /* la hauteur maximale animée */
-  overflow-y: auto;  /* autorise le scroll une fois ouverte */
-}
-
+/* === Contenu === */
 #live-preview h3 {
   margin-top: 0;
   margin-bottom: 12px;
@@ -1021,6 +1014,7 @@ html { scroll-behavior: smooth; }
   flex-direction: column;
   gap: 10px;
 }
+
 
 /* Cartes champion cohérentes avec le style des résultats */
 .champion-card {
@@ -1075,4 +1069,176 @@ html { scroll-behavior: smooth; }
   font-size: 13px;
   color: var(--muted);
   margin: 0;
+}
+
+/* Changelog */
+
+.changelog-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 80%;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.changelog-item {
+  background: rgba(255,255,255,0.05);
+  padding: 15px 20px;
+  border-radius: 12px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 10px rgba(0,0,0,0.2);
+}
+
+.changelog-item h3 {
+  color: #9bc9ff;
+  margin-bottom: 10px;
+}
+
+.changelog-item ul {
+  padding-left: 20px;
+}
+
+.changelog-item li {
+  margin-bottom: 6px;
+  line-height: 1.4;
+}
+
+/* ===== Header right ===== */
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px; /* espace constant entre les éléments */
+}
+
+/* ===== Icônes rondes (gear + changelog) ===== */
+.icon-circle {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: transparent;
+  border: 1px solid var(--border-weak, rgba(255,255,255,0.12));
+  text-decoration: none;            /* supprime tout soulignement */
+  color: inherit;                   /* pas de bleu/violet des liens */
+  outline: none;
+  cursor: pointer;
+  transition: transform .12s ease, background .12s ease, box-shadow .12s ease, border-color .12s ease;
+}
+
+/* Désactive les styles de lien natifs (bleu/violet) */
+a.icon-circle,
+a.icon-circle:visited,
+a.icon-circle:hover,
+a.icon-circle:active {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Hover/Focus doux */
+.icon-circle:hover,
+.icon-circle:focus-visible {
+  background: var(--surface-2, rgba(255,255,255,0.06));
+  border-color: var(--border, rgba(255,255,255,0.18));
+  box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+  transform: translateY(-1px);
+}
+
+/* Emoji gear */
+.admin-emoji {
+  font-size: 18px;
+  line-height: 1;
+}
+
+/* SVG changelog propre */
+.changelog-svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+  fill: currentColor; /* suit la couleur du texte (thème) */
+}
+
+/* ===== Transitions "DELUXE" ===== */
+
+/* Container: fondu + slide doux */
+main.container {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity .35s ease, transform .35s ease;
+  will-change: opacity, transform;
+}
+
+/* État sortie */
+.main-out {
+  opacity: 0;
+  transform: translateY(8px) scale(.995);
+}
+
+/* État entrée */
+.main-in {
+  opacity: 0;
+  transform: translateY(8px) scale(.995);
+}
+.main-in.main-in-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Rideau de transition plein écran */
+.transition-wrapper {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: radial-gradient(120% 120% at 50% -10%, rgba(0,140,255,.15), rgba(0,0,0,0) 60%),
+              linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.6));
+  opacity: 0;
+  transform: scale(1.02);
+  transition: opacity .28s ease, transform .28s ease;
+}
+
+/* Actif lors de la nav */
+.transition-active {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* Petit "flash" ligne en haut pour le peps */
+.transition-wrapper::after {
+  content: "";
+  position: absolute; left: 0; right: 0; top: 0; height: 2px;
+  background: linear-gradient(90deg, rgba(0,140,255,0), rgba(0,140,255,.9), rgba(0,140,255,0));
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity .28s ease, transform .28s ease;
+}
+.transition-active::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ===== Transitions container uniquement ===== */
+main.container {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity .24s ease, transform .24s ease;
+  will-change: opacity, transform;
+}
+
+/* sortie */
+.container-exit {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+/* entrée */
+.container-enter {
+  opacity: 0;
+  transform: translateY(6px);
+}
+.container-enter.container-enter-active {
+  opacity: 1;
+  transform: translateY(0);
 }
